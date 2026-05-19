@@ -31,11 +31,11 @@ If anything is wrong — fake serial, cloned QR, expired medicine, recalled batc
   Registers product        Scans box at each           Receives box,           Scans QR code
   Generates QR serials     checkpoint (location        verifies each           on medicine
   Packs into boxes         updated, timestamped)       medicine, dispenses     Sees full journey
-        │                        │                           │                       │
+        │                        │                           │                        │
         └────── Ship ───────────►└────── Ship ──────────────►└──── Dispense ─────────►│
                                                                                       │
-                              All monitored by 🏛️ Regulatory Authority                │
-                              (alerts, analytics, batch blocking, recalls)             │
+                               All monitored by 🏛️ Regulatory Authority               |
+                              (alerts, analytics, batch blocking, recalls)            │
                                                                                       ▼
                                                                             ✅ GENUINE or ❌ FAKE
 ```
@@ -144,24 +144,6 @@ npm run dev                  # Runs on port 3000
 
 ---
 
-## Demo Accounts
-
-All passwords: `password123`
-
-| Role | Email | Company |
-|------|-------|---------|
-| Manufacturer | admin@pfizer.com | Pfizer India Limited |
-| Manufacturer | admin@cipla.com | Cipla Limited |
-| Middleman | amit@medsupply.in | MedSupply Wholesale, Delhi |
-| Middleman | vikram@fasttrack.in | FastTrack Distributors, Bangalore |
-| Pharmacy | rajesh@apollopharmacy.in | Apollo Pharmacy, Delhi |
-| Pharmacy | priya@medplus.in | MedPlus Pharmacy, Mumbai |
-| Regulator | admin@cdsco.gov.in | CDSCO Regulatory Authority |
-
-**Test serials:** `2026-PFZ-ASP-0000001` through `2026-PFZ-ASP-0000200`
-
----
-
 ## Project Structure
 
 ```
@@ -249,8 +231,3 @@ PostgreSQL with **11 tables** and **30+ indexes**:
 - Cloud deployment with auto-scaling
 - Integration with CDSCO (India's drug regulatory body)
 
----
-
-## License
-
-Developed as a Theme Based Project at the Department of Computer Science & Engineering, Vasavi College of Engineering (Autonomous), affiliated to Osmania University, Hyderabad — 2026.
