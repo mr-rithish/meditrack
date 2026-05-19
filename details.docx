@@ -1,0 +1,1558 @@
+SECTION 1: PROJECT OVERVIEW
+1.1 Executive Summary
+Project Name: MediTrack - Medicine Anti-Counterfeit Tracking System
+
+Problem Statement: Counterfeit pharmaceuticals cause 10-15% contamination in medicine supply chains across developing nations, leading to hundreds of thousands of preventable deaths annually. Recent incidents include:
+
+Gambia (2022): 70+ children died from contaminated cough syrup
+Uzbekistan (2022): 18 children died from similar incident
+India: Multiple cases of fake cancer drugs, antibiotics
+The root cause: Lack of infrastructure to track medicines from production to patient.
+
+Solution: MediTrack creates a digital identity for every medicine package using unique serial numbers and Data Matrix barcodes, enabling complete traceability and real-time verification at every checkpoint in the supply chain.
+
+Key Innovation: Individual package-level tracking (not just batch tracking) + Hierarchical QR system (box-level convenience + individual-level security) + Mandatory pharmacy verification checkpoint.
+
+1.2 Project Scope
+In Scope (MVP - Minimum Viable Product):
+✅ Manufacturer portal (product registration, serial generation, QR creation)
+✅ Pharmacy portal (barcode scanning, verification, dispensing)
+✅ Patient verification app (PWA - Progressive Web App)
+✅ Basic regulatory dashboard (statistics, alerts)
+✅ Central database with verification logic
+✅ Hierarchical tracking (individual medicine + box level)
+✅ Camera-based barcode scanning
+✅ Real-time counterfeit detection
+✅ Simple alert system
+
+1.3 Success Criteria
+The MVP is considered successful if it demonstrates:
+
+Functional Completeness:
+Can generate 1000+ unique serial numbers
+Can create scannable QR codes
+Can verify medicines in < 2 seconds
+Can detect duplicate/invalid codes
+Can track medicine status (manufactured → dispensed)
+User Experience:
+Manufacturer can generate serials in < 5 clicks
+Pharmacy can scan and verify in < 3 seconds
+Patient can verify via smartphone camera
+Clear visual feedback (green/red for genuine/fake)
+Technical Performance:
+Database handles 10,000+ records smoothly
+API response time < 200ms
+Zero data loss (all transactions logged)
+Works on common browsers (Chrome, Firefox, Safari)
+Demonstration Capability:
+Can show complete flow: manufacturer → pharmacy → patient
+Can demonstrate counterfeit detection (invalid code, duplicate code)
+Can show regulatory dashboard with statistics
+SECTION 2: REAL-WORLD CONTEXT & MOTIVATION
+2.1 The Global Counterfeit Medicine Crisis
+Statistics:
+WHO estimate: 10-15% of medicines in developing countries are counterfeit
+Annual deaths: ~1 million people die from fake medicines
+Economic impact: $200 billion lost annually
+Regional impact: Up to 30% of medicines in some African/Asian regions are fake
+Real Incidents:
+Case 1: Gambia Cough Syrup Tragedy (2022)
+
+What happened: 70+ children died after consuming cough syrup
+Cause: Syrup contained diethylene glycol (industrial chemical, toxic)
+Root problem: No tracking system to trace origin or recall quickly
+Outcome: International scandal, WHO investigation
+Case 2: Fake Cancer Drugs (USA, 2012)
+
+What happened: Counterfeit Avastin (cancer drug) entered US supply chain
+Content: Contained no active ingredient - just salt, starch, cleaning solvents
+Impact: Cancer patients received ineffective treatment, some died
+Cost: Millions in damages, loss of trust
+Case 3: Fake Antimalarials (Africa, ongoing)
+
+Scale: Widespread across sub-Saharan Africa
+Content: No active ingredient or wrong dosages
+Impact: Contributed to malaria deaths, drug-resistant strains
+Estimate: 30% of antimalarials in some regions are fake
+Why Current Systems Fail:
+Bulk tracking only: Track batches, not individual packages
+No verification point: Pharmacies can't verify authenticity
+Manual processes: Paper-based records, easily forged
+Slow recalls: Takes weeks/months to locate affected medicines
+No patient empowerment: Patients have no way to verify
+2.2 Turkey's Success Story (ITS System)
+Background:
+Turkey implemented İlaç Takip Sistemi (ITS) in 2010 to combat widespread counterfeit medicines.
+
+How It Works:
+Every prescription medicine gets a unique Data Matrix barcode
+Manufacturers upload serial numbers to central government database
+Pharmacies must scan before dispensing (mandatory by law)
+System verifies in real-time (1-2 seconds)
+Patients can verify via mobile app or website
+Results (2010-Present):
+90%+ reduction in counterfeit medicines
+100% of prescription medicines tracked
+12,000+ pharmacies connected
+Billions of verifications performed
+Faster recalls: Hours instead of weeks
+Increased patient confidence
+Key Success Factors:
+Mandatory scanning at pharmacy (enforced by law)
+Government-run central database (single source of truth)
+Real-time verification (instant feedback)
+Simple user interface (pharmacists can use easily)
+Patient verification option (empowerment)
+Why We Use Turkey as Model:
+Proven effectiveness (90%+ reduction)
+Scalable (works at national level)
+Cost-effective (reasonable infrastructure costs)
+Replicable (can be adapted to other countries)
+Well-documented (implementation details available)
+SECTION 3: SYSTEM REQUIREMENTS ANALYSIS
+3.1 Functional Requirements
+FR1: Manufacturer Functions
+FR1.1 Product Registration
+
+Input: Product name, generic name, GTIN, dosage, strength, form, regulatory approval number
+Process: Validate GTIN format, check for duplicates, store in database
+Output: Unique product ID, confirmation message
+FR1.2 Serial Number Generation (Hierarchical)
+
+Input: Product ID, batch number, quantity, manufacturing date, expiry date, box size (default 100)
+Process:
+Generate unique serial numbers using cryptographic algorithm
+Format: [YEAR]-[MFR_CODE]-[PRODUCT_CODE]-[SEQUENCE]
+Example: 2024-PFZ-ASP-0001234
+Create box records (every 100 medicines = 1 box)
+Each box gets unique ID: BOX-2024-001
+Output:
+List of serial numbers
+Box IDs with contents mapping
+Downloadable CSV file
+FR1.3 QR Code Generation
+
+Input: Serial numbers, product details
+Process:
+Generate GS1-compliant Data Matrix barcode
+Format: (01)GTIN(21)Serial(17)ExpDate(10)Batch
+Create two types:
+Individual QR: For each medicine package
+Box QR: For shipping boxes (contains list of 100 serials)
+Output:
+QR code images (PNG, 200x200 pixels)
+Printable PDF with all codes
+High error correction level (Level H)
+FR2: Pharmacy Functions
+FR2.1 Box-Level Receipt (Convenience)
+
+Input: Box QR code scan
+Process:
+Decode box QR → Extract box ID
+Look up box in database
+Verify: Box exists, status = "at_wholesaler", not tampered
+Update all 100 medicines: status = "at_pharmacy", location = pharmacy ID
+Log transaction (box receive)
+Output:
+Success message: "✅ Received 100 medicines from Box-2024-001"
+List of serial numbers received
+Inventory updated
+FR2.2 Individual Medicine Verification (CRITICAL - Mandatory)
+
+Input: Individual medicine QR code scan
+Process:
+Decode QR → Extract serial number
+Perform multi-layer verification:
+Existence check: Does serial exist in database?
+Duplicate check: Already dispensed elsewhere?
+Expiry check: Past expiration date?
+Recall check: Part of recalled batch?
+Location check: Currently at this pharmacy?
+Based on checks, determine result
+Output:
+If ALL checks pass: ✅ "Genuine medicine - Safe to dispense"
+If ANY check fails: ❌ "COUNTERFEIT/WARNING" with specific reason
+Display: Product name, batch, expiry, manufacturer, status
+FR2.3 Medicine Dispensing
+
+Input: Verified serial number, pharmacist ID, patient info (optional)
+Process:
+Update medicine status: "at_pharmacy" → "dispensed"
+Record: dispensed_at (timestamp), dispensed_by (pharmacist ID)
+Log transaction (dispense action)
+Lock serial number (cannot be reused)
+Output:
+Confirmation message
+Updated inventory count
+Transaction receipt (optional)
+FR3: Patient Functions
+FR3.1 Medicine Verification (Camera Scan)
+
+Input: Medicine QR code (via smartphone camera)
+Process:
+Camera scans QR code using html5-qrcode library
+Decode → Extract serial number
+Send to verification API
+Receive verification result
+Output:
+If genuine:
+✅ "VERIFIED GENUINE MEDICINE"
+Product details (name, manufacturer, batch, expiry)
+Journey timeline (Factory → Wholesaler → Pharmacy)
+Dispensing details (date, pharmacy name)
+If fake:
+❌ "WARNING: POSSIBLE COUNTERFEIT"
+Reason (serial not found, duplicate, etc.)
+"Do NOT use. Report to authorities."
+Report button
+FR3.2 SMS Verification (Alternative for Basic Phones)
+
+Input: Serial number typed manually
+Process: Same as camera scan
+Output: Text-based result (simplified)
+Note: For MVP, simulate SMS (actual SMS gateway in phase 2)
+FR4: Regulatory Dashboard Functions
+FR4.1 Real-Time Monitoring
+
+Display:
+Total medicines tracked
+Verifications today/this hour
+Success vs. failure rate
+Active pharmacies
+Geographic distribution (simple map or list)
+FR4.2 Alert Management
+
+Trigger alerts for:
+Invalid serial number scanned
+Duplicate serial number detected
+Multiple failures from same pharmacy (suspicious pattern)
+Alert information:
+Alert type, severity, timestamp
+Serial number involved
+Pharmacy/location
+GPS coordinates (if available)
+Actions:
+View alert details
+Mark as investigating/resolved
+Generate report
+FR4.3 Recall Management (Basic)
+
+Input: Product ID or batch number
+Process:
+Mark all medicines in batch as "recalled"
+Block dispensing (pharmacy cannot sell)
+Identify locations (where medicines currently are)
+Generate list of affected pharmacies
+Output:
+Recall summary (total affected, current locations)
+List of pharmacies to contact
+Tracking dashboard (how many returned)
+3.2 Non-Functional Requirements
+NFR1: Performance
+Response Time: API calls < 200ms (95th percentile)
+Verification Speed: < 2 seconds from scan to result
+Concurrent Users: Support 100 simultaneous verifications
+Database Queries: Indexed queries < 50ms
+NFR2: Scalability
+Data Volume: Handle 100,000+ serial numbers
+Growth: Design supports 10x growth without architecture changes
+Auto-scaling: Plan for horizontal scaling (multiple servers)
+NFR3: Reliability
+Uptime: 99% availability target
+Data Integrity: Zero data loss (all transactions logged)
+Error Handling: Graceful degradation (if cache fails, use database)
+NFR4: Security
+Authentication: JWT-based with secure password hashing (bcrypt)
+Authorization: Role-based access (manufacturer, pharmacy, regulator)
+Data Protection: HTTPS for all communications
+SQL Injection: Use parameterized queries (prevent injection)
+XSS Prevention: Sanitize user inputs
+NFR5: Usability
+Mobile Responsive: Works on phones, tablets, laptops
+Browser Support: Chrome, Firefox, Safari, Edge
+Load Time: Pages load < 3 seconds
+Accessibility: Clear visual feedback (green/red indicators)
+NFR6: Maintainability
+Code Quality: Clean code, documented functions
+Version Control: Git with meaningful commit messages
+Documentation: API documentation, setup guide
+Modular Design: Separate concerns (routes, services, database)
+SECTION 4: TECHNICAL ARCHITECTURE
+4.1 High-Level Architecture
+┌─────────────────────────────────────────────────────┐
+│                 PRESENTATION LAYER                   │
+├─────────────────────────────────────────────────────┤
+│                                                      │
+│  ┌──────────────┐  ┌──────────────┐  ┌───────────┐ │
+│  │ Manufacturer │  │   Pharmacy   │  │  Patient  │ │
+│  │   Portal     │  │    Portal    │  │    App    │ │
+│  │  (React.js)  │  │  (React.js)  │  │   (PWA)   │ │
+│  └──────┬───────┘  └──────┬───────┘  └─────┬─────┘ │
+│         │                 │                 │       │
+└─────────┼─────────────────┼─────────────────┼───────┘
+          │                 │                 │
+          └─────────────────┴─────────────────┘
+                            │
+┌───────────────────────────▼─────────────────────────┐
+│                  APPLICATION LAYER                   │
+├─────────────────────────────────────────────────────┤
+│                                                      │
+│            ┌─────────────────────────┐              │
+│            │    EXPRESS.JS SERVER    │              │
+│            │   (Node.js Runtime)     │              │
+│            └───────────┬─────────────┘              │
+│                        │                             │
+│       ┌────────────────┼────────────────┐           │
+│       │                │                │           │
+│  ┌────▼─────┐    ┌────▼─────┐    ┌────▼─────┐     │
+│  │  Routes  │    │ Services │    │Middleware│     │
+│  │          │    │          │    │          │     │
+│  │ • Auth   │    │• Serial  │    │• JWT     │     │
+│  │ • API    │    │• Verify  │    │• CORS    │     │
+│  │ • Upload │    │• Alert   │    │• Logger  │     │
+│  └──────────┘    └──────────┘    └──────────┘     │
+│                                                      │
+└───────────────────────────┬─────────────────────────┘
+                            │
+┌───────────────────────────▼─────────────────────────┐
+│                    DATA LAYER                        │
+├─────────────────────────────────────────────────────┤
+│                                                      │
+│   ┌──────────────────┐        ┌──────────────────┐ │
+│   │   PostgreSQL     │        │      Redis       │ │
+│   │    Database      │        │   (Optional)     │ │
+│   │                  │        │                  │ │
+│   │ • Products       │        │ • Cache          │ │
+│   │ • Serial Numbers │        │ • Sessions       │ │
+│   │ • Boxes          │        │ • Quick Lookup   │ │
+│   │ • Transactions   │        │                  │ │
+│   │ • Users          │        │                  │ │
+│   │ • Alerts         │        │                  │ │
+│   └──────────────────┘        └──────────────────┘ │
+│                                                      │
+└─────────────────────────────────────────────────────┘
+4.2 Component Breakdown
+4.2.1 Frontend Components
+Technology: React.js 18+
+
+Structure:
+
+frontend/
+├── public/
+│   ├── index.html
+│   └── manifest.json (for PWA)
+├── src/
+│   ├── components/
+│   │   ├── common/
+│   │   │   ├── Navbar.jsx
+│   │   │   ├── Button.jsx
+│   │   │   └── Alert.jsx
+│   │   ├── manufacturer/
+│   │   │   ├── ProductForm.jsx
+│   │   │   ├── SerialGenerator.jsx
+│   │   │   └── QRDisplay.jsx
+│   │   ├── pharmacy/
+│   │   │   ├── Scanner.jsx
+│   │   │   ├── VerificationResult.jsx
+│   │   │   └── InventoryList.jsx
+│   │   └── patient/
+│   │       ├── ScanPage.jsx
+│   │       └── ResultPage.jsx
+│   ├── pages/
+│   │   ├── ManufacturerDashboard.jsx
+│   │   ├── PharmacyDashboard.jsx
+│   │   ├── PatientVerify.jsx
+│   │   └── RegulatoryDashboard.jsx
+│   ├── services/
+│   │   └── api.js (API calls using axios)
+│   ├── utils/
+│   │   └── constants.js
+│   ├── App.jsx
+│   └── index.js
+└── package.json
+Key Libraries:
+
+json
+{
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-router-dom": "^6.14.0",
+    "axios": "^1.4.0",
+    "html5-qrcode": "^2.3.8",
+    "chart.js": "^4.3.0",
+    "react-chartjs-2": "^5.2.0"
+  }
+}
+```
+
+---
+
+### **4.2.2 Backend Components**
+
+**Technology:** Node.js + Express.js
+
+**Structure:**
+```
+backend/
+├── src/
+│   ├── config/
+│   │   ├── database.js (DB connection)
+│   │   └── env.js (environment variables)
+│   ├── controllers/
+│   │   ├── authController.js
+│   │   ├── manufacturerController.js
+│   │   ├── pharmacyController.js
+│   │   └── regulatorController.js
+│   ├── services/
+│   │   ├── serializationService.js
+│   │   ├── verificationService.js
+│   │   ├── qrcodeService.js
+│   │   └── alertService.js
+│   ├── models/
+│   │   ├── User.js
+│   │   ├── Product.js
+│   │   ├── SerialNumber.js
+│   │   ├── Box.js
+│   │   ├── Transaction.js
+│   │   └── Alert.js
+│   ├── routes/
+│   │   ├── auth.routes.js
+│   │   ├── manufacturer.routes.js
+│   │   ├── pharmacy.routes.js
+│   │   ├── patient.routes.js
+│   │   └── regulator.routes.js
+│   ├── middleware/
+│   │   ├── auth.middleware.js
+│   │   ├── errorHandler.js
+│   │   └── logger.js
+│   ├── utils/
+│   │   ├── serialGenerator.js
+│   │   └── validators.js
+│   └── app.js (main server file)
+├── tests/
+│   └── (test files)
+├── package.json
+└── .env
+Key Libraries:
+
+json
+{
+  "dependencies": {
+    "express": "^4.18.2",
+    "pg": "^8.11.0",
+    "sequelize": "^6.32.0",
+    "bcrypt": "^5.1.0",
+    "jsonwebtoken": "^9.0.0",
+    "qrcode": "^1.5.3",
+    "uuid": "^9.0.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.0",
+    "express-validator": "^7.0.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  }
+}
+4.2.3 Database Components
+Technology: PostgreSQL 15+
+
+Connection Configuration:
+
+javascript
+// config/database.js
+const { Sequelize } = require('sequelize');
+
+const sequelize = new Sequelize(
+  process.env.DB_NAME,
+  process.env.DB_USER,
+  process.env.DB_PASSWORD,
+  {
+    host: process.env.DB_HOST,
+    port: process.env.DB_PORT || 5432,
+    dialect: 'postgres',
+    logging: false, // Set to console.log for debugging
+    pool: {
+      max: 10,
+      min: 2,
+      acquire: 30000,
+      idle: 10000
+    }
+  }
+);
+
+module.exports = sequelize;
+```
+
+---
+
+# **SECTION 5: DATABASE DESIGN**
+
+## **5.1 Entity Relationship Diagram (ERD)**
+```
+┌────────────────┐
+│ manufacturers  │
+└────────┬───────┘
+         │ 1
+         │
+         │ N
+┌────────▼───────┐
+│   products     │
+└────────┬───────┘
+         │ 1
+         │
+         │ N
+┌────────▼───────┐      ┌─────────────┐
+│     boxes      │──────│box_contents │
+└────────┬───────┘  N:N └──────┬──────┘
+         │ 1                    │
+         │                      │
+         │ N                    │ N
+┌────────▼───────────────────────▼──┐
+│        serial_numbers              │
+└────────┬───────────────────────────┘
+         │ 1
+         │
+         │ N
+┌────────▼───────┐    ┌──────────────┐
+│ transactions   │    │ verifications│
+└────────────────┘    └──────────────┘
+
+┌────────────────┐    ┌──────────────┐
+│     users      │    │    alerts    │
+└────────────────┘    └──────────────┘
+
+┌────────────────┐
+│    recalls     │
+└────────────────┘
+5.2 Complete Database Schema
+Table 1: manufacturers
+sql
+CREATE TABLE manufacturers (
+  manufacturer_id VARCHAR(50) PRIMARY KEY,
+  company_name VARCHAR(255) NOT NULL,
+  license_number VARCHAR(100) UNIQUE NOT NULL,
+  address TEXT,
+  city VARCHAR(100),
+  state VARCHAR(100),
+  country VARCHAR(100) DEFAULT 'India',
+  contact_email VARCHAR(255),
+  contact_phone VARCHAR(50),
+  status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'suspended', 'inactive')),
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Indexes
+CREATE INDEX idx_manufacturers_status ON manufacturers(status);
+CREATE INDEX idx_manufacturers_license ON manufacturers(license_number);
+Purpose: Store pharmaceutical companies that are authorized to manufacture medicines.
+
+Sample Data:
+
+sql
+INSERT INTO manufacturers VALUES 
+('MFR-PFZ-001', 'Pfizer India Limited', 'LIC-PFZ-2024-001', 
+ 'Pfizer Complex, Village Thokarpur', 'Mumbai', 'Maharashtra', 'India',
+ 'contact@pfizerindia.com', '+91-22-6693-4444', 'active', NOW(), NOW());
+Table 2: products
+sql
+CREATE TABLE products (
+  product_id VARCHAR(50) PRIMARY KEY,
+  manufacturer_id VARCHAR(50) NOT NULL REFERENCES manufacturers(manufacturer_id) ON DELETE CASCADE,
+  product_name VARCHAR(255) NOT NULL,
+  generic_name VARCHAR(255),
+  gtin VARCHAR(14) NOT NULL UNIQUE,  -- Global Trade Item Number (GS1)
+  strength VARCHAR(50),               -- e.g., "500mg"
+  dosage_form VARCHAR(100),           -- e.g., "Tablet", "Syrup"
+  packaging VARCHAR(100),             -- e.g., "10 tablets per strip"
+  registration_number VARCHAR(100),   -- Drug regulatory approval number
+  approved_by VARCHAR(100),           -- e.g., "CDSCO" (India), "FDA" (USA)
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Indexes
+CREATE INDEX idx_products_manufacturer ON products(manufacturer_id);
+CREATE INDEX idx_products_gtin ON products(gtin);
+CREATE INDEX idx_products_name ON products(product_name);
+Purpose: Store medicine product catalog.
+
+Sample Data:
+
+sql
+INSERT INTO products VALUES 
+('PROD-ASP-500', 'MFR-PFZ-001', 'Aspirin', 'Acetylsalicylic Acid',
+ '05412345678900', '500mg', 'Tablet', '10 tablets per strip',
+ 'REG-IND-2024-001', 'CDSCO', NOW(), NOW());
+Table 3: boxes (Hierarchical tracking)
+sql
+CREATE TABLE boxes (
+  box_id VARCHAR(50) PRIMARY KEY,
+  product_id VARCHAR(50) NOT NULL REFERENCES products(product_id) ON DELETE CASCADE,
+  batch_number VARCHAR(100) NOT NULL,
+  box_qr_code VARCHAR(200) UNIQUE NOT NULL,
+  total_medicines INTEGER DEFAULT 100,
+  manufacturing_date DATE NOT NULL,
+  expiry_date DATE NOT NULL,
+  status VARCHAR(20) DEFAULT 'manufactured' CHECK (status IN ('manufactured', 'in_transit', 'at_wholesaler', 'at_pharmacy', 'opened')),
+  seal_code VARCHAR(100),  -- Tamper-evident seal code
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Indexes
+CREATE INDEX idx_boxes_batch ON boxes(batch_number);
+CREATE INDEX idx_boxes_qr ON boxes(box_qr_code);
+CREATE INDEX idx_boxes_status ON boxes(status);
+Purpose: Track shipping boxes containing 100 medicines each.
+
+Sample Data:
+
+sql
+INSERT INTO boxes VALUES 
+('BOX-2024-001', 'PROD-ASP-500', 'BATCH-2024-001', 
+ 'BOX-QR-2024-001', 100, '2024-02-01', '2026-02-01',
+ 'manufactured', 'SEAL-ABC123', NOW(), NOW());
+Table 4: serial_numbers ⭐ MAIN TABLE
+sql
+CREATE TABLE serial_numbers (
+  serial_number VARCHAR(100) PRIMARY KEY,
+  product_id VARCHAR(50) NOT NULL REFERENCES products(product_id) ON DELETE CASCADE,
+  box_id VARCHAR(50) REFERENCES boxes(box_id) ON DELETE SET NULL,
+  batch_number VARCHAR(100) NOT NULL,
+  manufacturing_date DATE NOT NULL,
+  expiry_date DATE NOT NULL,
+  gs1_data TEXT,  -- Complete GS1 barcode string
+  qr_code_url TEXT,  -- S3 URL or base64 data
+  status VARCHAR(20) DEFAULT 'manufactured' 
+    CHECK (status IN ('manufactured', 'in_transit', 'at_wholesaler', 'at_pharmacy', 'dispensed', 'recalled', 'expired')),
+  current_location VARCHAR(100),  -- Current pharmacy/warehouse ID
+  dispensed_at TIMESTAMP,
+  dispensed_by VARCHAR(100),  -- Pharmacist ID
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Indexes (CRITICAL FOR PERFORMANCE)
+CREATE INDEX idx_serial_product ON serial_numbers(product_id);
+CREATE INDEX idx_serial_box ON serial_numbers(box_id);
+CREATE INDEX idx_serial_batch ON serial_numbers(batch_number);
+CREATE INDEX idx_serial_status ON serial_numbers(status);
+CREATE INDEX idx_serial_expiry ON serial_numbers(expiry_date);
+CREATE INDEX idx_serial_location ON serial_numbers(current_location);
+Purpose: Store every individual medicine package. This table will have millions of rows.
+
+Sample Data:
+
+sql
+INSERT INTO serial_numbers VALUES 
+('2024-PFZ-ASP-0000001', 'PROD-ASP-500', 'BOX-2024-001', 'BATCH-2024-001',
+ '2024-02-01', '2026-02-01', '(01)05412345678900(21)2024-PFZ-ASP-0000001(17)260201(10)BATCH-2024-001',
+ 'data:image/png;base64,...', 'manufactured', NULL, NULL, NULL, NOW(), NOW());
+Table 5: box_contents (Mapping table)
+sql
+CREATE TABLE box_contents (
+  id SERIAL PRIMARY KEY,
+  box_id VARCHAR(50) NOT NULL REFERENCES boxes(box_id) ON DELETE CASCADE,
+  serial_number VARCHAR(100) NOT NULL REFERENCES serial_numbers(serial_number) ON DELETE CASCADE,
+  position INTEGER NOT NULL CHECK (position >= 1 AND position <= 100),
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(box_id, serial_number),
+  UNIQUE(box_id, position)
+);
+
+-- Indexes
+CREATE INDEX idx_box_contents_box ON box_contents(box_id);
+CREATE INDEX idx_box_contents_serial ON box_contents(serial_number);
+Purpose: Map which medicines are in which box (many-to-many relationship).
+
+Sample Data:
+
+sql
+INSERT INTO box_contents (box_id, serial_number, position) VALUES 
+('BOX-2024-001', '2024-PFZ-ASP-0000001', 1),
+('BOX-2024-001', '2024-PFZ-ASP-0000002', 2),
+-- ... 98 more
+('BOX-2024-001', '2024-PFZ-ASP-0000100', 100);
+Table 6: supply_chain_actors
+sql
+CREATE TABLE supply_chain_actors (
+  actor_id VARCHAR(50) PRIMARY KEY,
+  actor_type VARCHAR(20) NOT NULL CHECK (actor_type IN ('manufacturer', 'wholesaler', 'distributor', 'pharmacy', 'hospital')),
+  company_name VARCHAR(255) NOT NULL,
+  license_number VARCHAR(100) UNIQUE NOT NULL,
+  address TEXT,
+  city VARCHAR(100),
+  state VARCHAR(100),
+  country VARCHAR(100) DEFAULT 'India',
+  gln VARCHAR(13),  -- Global Location Number (GS1)
+  contact_person VARCHAR(255),
+  contact_email VARCHAR(255),
+  contact_phone VARCHAR(50),
+  latitude DECIMAL(10, 8),
+  longitude DECIMAL(11, 8),
+  status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'suspended', 'inactive')),
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Indexes
+CREATE INDEX idx_actors_type ON supply_chain_actors(actor_type);
+CREATE INDEX idx_actors_city ON supply_chain_actors(city);
+CREATE INDEX idx_actors_status ON supply_chain_actors(status);
+Purpose: Store wholesalers, distributors, pharmacies, hospitals.
+
+Sample Data:
+
+sql
+INSERT INTO supply_chain_actors VALUES 
+('PHARM-DEL-001', 'pharmacy', 'Apollo Pharmacy - Connaught Place',
+ 'LIC-PHARM-DEL-2024-001', 'N-19, Connaught Place', 'New Delhi', 'Delhi', 'India',
+ '1234567890123', 'Rajesh Kumar', 'rajesh@apollopharmacy.in', '+91-11-2334-5678',
+ 28.6328, 77.2197, 'active', NOW(), NOW());
+Table 7: transactions ⭐ AUDIT TRAIL
+sql
+CREATE TABLE transactions (
+  transaction_id BIGSERIAL PRIMARY KEY,
+  serial_number VARCHAR(100) REFERENCES serial_numbers(serial_number) ON DELETE SET NULL,
+  box_id VARCHAR(50) REFERENCES boxes(box_id) ON DELETE SET NULL,
+  transaction_type VARCHAR(20) NOT NULL 
+    CHECK (transaction_type IN ('manufacture', 'ship', 'receive', 'transfer', 'dispense', 'return', 'destroy')),
+  from_actor_id VARCHAR(50) REFERENCES supply_chain_actors(actor_id) ON DELETE SET NULL,
+  to_actor_id VARCHAR(50) REFERENCES supply_chain_actors(actor_id) ON DELETE SET NULL,
+  transaction_date TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  location_lat DECIMAL(10, 8),
+  location_lon DECIMAL(11, 8),
+  scanned_by VARCHAR(100),  -- User ID who performed scan
+  device_id VARCHAR(100),
+  notes TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Indexes
+CREATE INDEX idx_transactions_serial ON transactions(serial_number);
+CREATE INDEX idx_transactions_box ON transactions(box_id);
+CREATE INDEX idx_transactions_type ON transactions(transaction_type);
+CREATE INDEX idx_transactions_date ON transactions(transaction_date);
+CREATE INDEX idx_transactions_from ON transactions(from_actor_id);
+CREATE INDEX idx_transactions_to ON transactions(to_actor_id);
+Purpose: Log every single scan/movement. Immutable audit trail.
+
+Sample Data:
+
+sql
+INSERT INTO transactions (serial_number, transaction_type, from_actor_id, to_actor_id, scanned_by) VALUES 
+('2024-PFZ-ASP-0000001', 'manufacture', 'MFR-PFZ-001', NULL, 'SYSTEM'),
+('2024-PFZ-ASP-0000001', 'ship', 'MFR-PFZ-001', 'WHSL-DEL-001', 'USER-MFR-123'),
+('2024-PFZ-ASP-0000001', 'receive', 'WHSL-DEL-001', 'PHARM-DEL-001', 'USER-WHSL-456'),
+('2024-PFZ-ASP-0000001', 'dispense', 'PHARM-DEL-001', 'PATIENT', 'USER-PHARM-789');
+Table 8: verifications
+sql
+CREATE TABLE verifications (
+  verification_id BIGSERIAL PRIMARY KEY,
+  serial_number VARCHAR(100),  -- May not exist if fake
+  requested_by VARCHAR(20) CHECK (requested_by IN ('pharmacy', 'patient', 'inspector', 'system')),
+  verification_result VARCHAR(20) NOT NULL 
+    CHECK (verification_result IN ('valid', 'invalid', 'already_used', 'expired', 'recalled', 'suspicious')),
+  failure_reason VARCHAR(255),  -- Specific reason if failed
+  request_timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  ip_address VARCHAR(45),
+  device_info TEXT,
+  location_lat DECIMAL(10, 8),
+  location_lon DECIMAL(11, 8),
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Indexes
+CREATE INDEX idx_verifications_serial ON verifications(serial_number);
+CREATE INDEX idx_verifications_result ON verifications(verification_result);
+CREATE INDEX idx_verifications_timestamp ON verifications(request_timestamp);
+Purpose: Log every verification attempt (even failures). Helps detect patterns.
+
+Sample Data:
+
+sql
+INSERT INTO verifications (serial_number, requested_by, verification_result) VALUES 
+('2024-PFZ-ASP-0000001', 'pharmacy', 'valid'),
+('FAKE-12345', 'pharmacy', 'invalid'),
+('2024-PFZ-ASP-0000001', 'patient', 'valid');
+Table 9: alerts
+sql
+CREATE TABLE alerts (
+  alert_id BIGSERIAL PRIMARY KEY,
+  alert_type VARCHAR(50) NOT NULL 
+    CHECK (alert_type IN ('duplicate_scan', 'invalid_code', 'suspicious_pattern', 
+                          'unauthorized_location', 'recalled_product', 'tampered_seal', 'expired_medicine')),
+  serial_number VARCHAR(100),
+  box_id VARCHAR(50),
+  actor_id VARCHAR(50) REFERENCES supply_chain_actors(actor_id) ON DELETE SET NULL,
+  severity VARCHAR(20) NOT NULL CHECK (severity IN ('low', 'medium', 'high', 'critical')),
+  description TEXT NOT NULL,
+  alert_timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  status VARCHAR(20) DEFAULT 'new' CHECK (status IN ('new', 'investigating', 'resolved', 'false_positive')),
+  assigned_to VARCHAR(100),  -- Regulator/inspector ID
+  resolved_at TIMESTAMP,
+  resolution_notes TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Indexes
+CREATE INDEX idx_alerts_type ON alerts(alert_type);
+CREATE INDEX idx_alerts_status ON alerts(status);
+CREATE INDEX idx_alerts_severity ON alerts(severity);
+CREATE INDEX idx_alerts_timestamp ON alerts(alert_timestamp);
+Purpose: Track all security alerts for regulatory investigation.
+
+Sample Data:
+
+sql
+INSERT INTO alerts (alert_type, serial_number, actor_id, severity, description) VALUES 
+('invalid_code', 'FAKE-99999', 'PHARM-DEL-001', 'critical', 
+ 'Pharmacy attempted to scan invalid serial number. Possible counterfeit detected.');
+Table 10: recalls
+sql
+CREATE TABLE recalls (
+  recall_id VARCHAR(50) PRIMARY KEY,
+  product_id VARCHAR(50) REFERENCES products(product_id) ON DELETE CASCADE,
+  batch_numbers TEXT[],  -- PostgreSQL array of affected batches
+  recall_reason TEXT NOT NULL,
+  recall_date DATE NOT NULL,
+  recall_type VARCHAR(20) CHECK (recall_type IN ('voluntary', 'mandatory')),
+  severity VARCHAR(20) CHECK (severity IN ('class_1', 'class_2', 'class_3')),  
+  -- Class 1: Dangerous/life-threatening, Class 2: Temporary health risk, Class 3: Unlikely to cause harm
+  status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'completed', 'cancelled')),
+  affected_count INTEGER,  -- Total medicines in affected batches
+  returned_count INTEGER DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  completed_at TIMESTAMP
+);
+
+-- Indexes
+CREATE INDEX idx_recalls_product ON recalls(product_id);
+CREATE INDEX idx_recalls_status ON recalls(status);
+Purpose: Manage product recalls.
+
+Sample Data:
+
+sql
+INSERT INTO recalls VALUES 
+('RECALL-2024-001', 'PROD-ASP-500', ARRAY['BATCH-2024-001'], 
+ 'Contamination detected during quality control', '2024-03-01',
+ 'mandatory', 'class_1', 'active', 10000, 0, NOW(), NULL);
+Table 11: users
+sql
+CREATE TABLE users (
+  user_id VARCHAR(50) PRIMARY KEY,
+  username VARCHAR(100) UNIQUE NOT NULL,
+  email VARCHAR(255) UNIQUE NOT NULL,
+  password_hash VARCHAR(255) NOT NULL,
+  role VARCHAR(20) NOT NULL CHECK (role IN ('manufacturer', 'pharmacy', 'wholesaler', 'regulator', 'admin')),
+  actor_id VARCHAR(50) REFERENCES supply_chain_actors(actor_id) ON DELETE SET NULL,
+  -- For manufacturer role, references manufacturers table separately
+  manufacturer_id VARCHAR(50) REFERENCES manufacturers(manufacturer_id) ON DELETE SET NULL,
+  full_name VARCHAR(255),
+  phone VARCHAR(50),
+  status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'inactive', 'suspended')),
+  last_login TIMESTAMP,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Indexes
+CREATE INDEX idx_users_email ON users(email);
+CREATE INDEX idx_users_role ON users(role);
+CREATE INDEX idx_users_status ON users(status);
+Purpose: Authentication and authorization.
+
+Sample Data:
+
+sql
+-- Password: "password123" hashed with bcrypt
+INSERT INTO users VALUES 
+('USER-MFR-001', 'pfizer_admin', 'admin@pfizer.com', 
+ '$2b$10$abcdefghijklmnopqrstuvwxyz', 'manufacturer', NULL, 'MFR-PFZ-001',
+ 'John Doe', '+91-22-1234-5678', 'active', NULL, NOW(), NOW());
+5.3 Database Performance Optimization
+Why Indexing Matters:
+Without Index:
+
+sql
+-- Search through 1 million records one by one
+SELECT * FROM serial_numbers WHERE serial_number = '2024-PFZ-ASP-0000001';
+-- Time: 5-10 seconds ❌
+With Index (PRIMARY KEY):
+
+sql
+-- Jump directly to the record using B-tree index
+SELECT * FROM serial_numbers WHERE serial_number = '2024-PFZ-ASP-0000001';
+-- Time: 0.001-0.01 seconds ✅ (1000x faster!)
+Index Strategy:
+sql
+-- ALWAYS index:
+1. Primary keys (automatic)
+2. Foreign keys
+3. Columns used in WHERE clauses
+4. Columns used in JOIN conditions
+5. Columns used for sorting (ORDER BY)
+
+-- NEVER index:
+1. Columns with very few distinct values (e.g., boolean)
+2. Small tables (< 1000 rows)
+3. Columns rarely queried
+Query Optimization Examples:
+Bad Query (No index used):
+
+sql
+SELECT * FROM serial_numbers WHERE LOWER(batch_number) = 'batch-2024-001';
+-- Function on column prevents index usage
+-- Time: 5 seconds for 1M rows
+Good Query (Uses index):
+
+sql
+SELECT * FROM serial_numbers WHERE batch_number = 'BATCH-2024-001';
+-- Direct comparison uses idx_serial_batch index
+-- Time: 0.01 seconds
+*Bad Query (SELECT ):
+
+sql
+SELECT * FROM serial_numbers WHERE serial_number = '...';
+-- Fetches ALL columns (waste of data transfer)
+Good Query (SELECT specific columns):
+
+sql
+SELECT serial_number, status, expiry_date FROM serial_numbers WHERE serial_number = '...';
+-- Fetches only needed columns
+-- Faster and less memory
+```
+
+---
+
+# **SECTION 6: FEATURE SPECIFICATIONS**
+
+## **6.1 Serial Number Generation Algorithm**
+
+### **Requirements:**
+- Must be **unique** (no duplicates ever)
+- Must be **unpredictable** (cannot guess next number)
+- Must be **short enough** to fit in QR code
+- Must contain **meaningful information** (year, manufacturer, product)
+
+### **Format Design:**
+```
+Structure: [YEAR]-[MFR_CODE]-[PRODUCT_CODE]-[SEQUENCE]
+
+Example: 2024-PFZ-ASP-0001234
+
+Components:
+├─ YEAR: 4 digits (2024)
+├─ MFR_CODE: 3 letters (PFZ = Pfizer)
+├─ PRODUCT_CODE: 3 letters (ASP = Aspirin)
+└─ SEQUENCE: 7 digits (0001234)
+
+Total length: 21 characters
+Implementation:
+javascript
+// services/serializationService.js
+
+const crypto = require('crypto');
+
+class SerializationService {
+  
+  /**
+   * Generate unique serial numbers for a batch
+   * @param {string} productId - Product identifier
+   * @param {number} quantity - How many serials to generate
+   * @param {string} batchNumber - Batch identifier
+   * @param {string} manufacturerCode - 3-letter manufacturer code
+   * @param {string} productCode - 3-letter product code
+   * @returns {Array} Array of serial numbers
+   */
+  async generateSerialNumbers(productId, quantity, batchNumber, manufacturerCode, productCode) {
+    const serialNumbers = [];
+    const year = new Date().getFullYear();
+    
+    // Get the last sequence number for this product
+    const lastSerial = await this.getLastSequence(productId, year);
+    let sequence = lastSerial + 1;
+    
+    for (let i = 0; i < quantity; i++) {
+      // Format: YEAR-MFR-PROD-SEQUENCE
+      const serialNumber = `${year}-${manufacturerCode}-${productCode}-${String(sequence).padStart(7, '0')}`;
+      
+      // Verify uniqueness (critical!)
+      const exists = await this.checkSerialExists(serialNumber);
+      if (exists) {
+        // Extremely rare, but handle it
+        sequence++;
+        i--; // Retry this iteration
+        continue;
+      }
+      
+      serialNumbers.push({
+        serialNumber,
+        batchNumber,
+        productId
+      });
+      
+      sequence++;
+    }
+    
+    return serialNumbers;
+  }
+  
+  /**
+   * Get last used sequence number
+   */
+  async getLastSequence(productId, year) {
+    const result = await db.query(`
+      SELECT serial_number 
+      FROM serial_numbers 
+      WHERE product_id = $1 
+        AND serial_number LIKE $2
+      ORDER BY serial_number DESC 
+      LIMIT 1
+    `, [productId, `${year}-%`]);
+    
+    if (!result.rows.length) {
+      return 0; // First serial for this product this year
+    }
+    
+    // Extract sequence from format: YEAR-MFR-PROD-SEQUENCE
+    const parts = result.rows[0].serial_number.split('-');
+    const lastSequence = parseInt(parts[3], 10);
+    return lastSequence;
+  }
+  
+  /**
+   * Check if serial number already exists
+   */
+  async checkSerialExists(serialNumber) {
+    const result = await db.query(
+      'SELECT 1 FROM serial_numbers WHERE serial_number = $1',
+      [serialNumber]
+    );
+    return result.rows.length > 0;
+  }
+  
+  /**
+   * Alternative: Add cryptographic randomness for extra security
+   */
+  generateCryptoSerial(prefix, sequence) {
+    // Generate 4 random bytes
+    const randomBytes = crypto.randomBytes(4);
+    const randomHex = randomBytes.toString('hex').toUpperCase();
+    
+    // Format: PREFIX-SEQUENCE-RANDOM
+    return `${prefix}-${String(sequence).padStart(7, '0')}-${randomHex}`;
+    // Example: 2024-PFZ-ASP-0001234-A3F9B2C1
+  }
+}
+
+module.exports = new SerializationService();
+Box ID Generation:
+javascript
+/**
+ * Generate box IDs for hierarchical tracking
+ * @param {number} numBoxes - How many boxes needed
+ * @param {string} batchNumber - Batch identifier
+ * @returns {Array} Array of box objects
+ */
+async generateBoxes(numBoxes, batchNumber, productId) {
+  const boxes = [];
+  const year = new Date().getFullYear();
+  
+  // Get last box number
+  const lastBoxNum = await this.getLastBoxNumber(year);
+  let boxNum = lastBoxNum + 1;
+  
+  for (let i = 0; i < numBoxes; i++) {
+    const boxId = `BOX-${year}-${String(boxNum).padStart(4, '0')}`;
+    const boxQRCode = `BOX-QR-${year}-${String(boxNum).padStart(4, '0')}`;
+    
+    boxes.push({
+      boxId,
+      boxQRCode,
+      batchNumber,
+      productId,
+      totalMedicines: 100
+    });
+    
+    boxNum++;
+  }
+  
+  return boxes;
+}
+6.2 QR Code Generation
+GS1 Standard Format:
+javascript
+// services/qrcodeService.js
+
+const QRCode = require('qrcode');
+
+class QRCodeService {
+  
+  /**
+   * Generate GS1-compliant Data Matrix barcode
+   * @param {string} gtin - Global Trade Item Number (14 digits)
+   * @param {string} serialNumber - Unique serial number
+   * @param {string} expiryDate - Expiry date (YYMMDD format)
+   * @param {string} batchNumber - Batch/lot number
+   * @returns {Object} QR code data and image
+   */
+  async generateDataMatrix(gtin, serialNumber, expiryDate, batchNumber) {
+    
+    // GS1 Application Identifiers:
+    // (01) = GTIN
+    // (21) = Serial Number
+    // (17) = Expiry Date (YYMMDD)
+    // (10) = Batch/Lot Number
+    
+    const gs1Data = `(01)${gtin}(21)${serialNumber}(17)${expiryDate}(10)${batchNumber}`;
+    
+    // Generate QR code as Data URL (base64-encoded PNG)
+    const qrCodeImage = await QRCode.toDataURL(gs1Data, {
+      type: 'image/png',
+      errorCorrectionLevel: 'H',  // High error correction (30% damage tolerance)
+      width: 200,                  // 200x200 pixels
+      margin: 1,                   // Minimal white border
+      color: {
+        dark: '#000000',
+        light: '#FFFFFF'
+      }
+    });
+    
+    return {
+      gs1Data,           // Raw GS1 string
+      qrCodeImage,       // Base64 PNG: "data:image/png;base64,iVBORw0KG..."
+      serialNumber       // For reference
+    };
+  }
+  
+  /**
+   * Generate box-level QR code
+   * Contains box ID and list of serial numbers inside
+   */
+  async generateBoxQR(boxId, serialNumbers) {
+    // For box QR, we encode the box ID
+    // The system will look up box contents in database
+    const boxData = {
+      type: 'BOX',
+      boxId: boxId,
+      count: serialNumbers.length
+      // Don't encode full list of serials in QR (too large)
+      // Database lookup is more reliable
+    };
+    
+    const qrCodeImage = await QRCode.toDataURL(JSON.stringify(boxData), {
+      errorCorrectionLevel: 'H',
+      width: 250
+    });
+    
+    return {
+      boxId,
+      qrCodeImage,
+      containsSerials: serialNumbers
+    };
+  }
+  
+  /**
+   * Generate printable PDF with all QR codes
+   */
+  async generatePrintablePDF(qrCodes, productInfo) {
+    const PDFDocument = require('pdfkit');
+    const doc = new PDFDocument();
+    
+    // Title
+    doc.fontSize(16).text(`QR Codes for ${productInfo.productName}`, { align: 'center' });
+    doc.fontSize(10).text(`Batch: ${productInfo.batchNumber}`, { align: 'center' });
+    doc.moveDown();
+    
+    // Grid layout: 4 columns × 6 rows = 24 QR codes per page
+    const qrSize = 120;
+    const margin = 40;
+    const cols = 4;
+    const rows = 6;
+    
+    let col = 0;
+    let row = 0;
+    
+    qrCodes.forEach((qr, index) => {
+      // Calculate position
+      const x = margin + (col * (qrSize + 20));
+      const y = margin + 100 + (row * (qrSize + 40));
+      
+      // Add QR code image
+      doc.image(qr.qrCodeImage, x, y, { width: qrSize, height: qrSize });
+      
+      // Add serial number below QR
+      doc.fontSize(8).text(qr.serialNumber, x, y + qrSize + 5, {
+        width: qrSize,
+        align: 'center'
+      });
+      
+      // Move to next position
+      col++;
+      if (col >= cols) {
+        col = 0;
+        row++;
+      }
+      
+      // New page after 24 codes
+      if (row >= rows) {
+        doc.addPage();
+        col = 0;
+        row = 0;
+      }
+    });
+    
+    doc.end();
+    return doc;
+  }
+  
+  /**
+   * Parse GS1 barcode data
+   * Used when scanning QR codes
+   */
+  parseGS1(scannedData) {
+    // Example input: "(01)05412345678900(21)2024-PFZ-ASP-0001234(17)260630(10)BATCH-2024-001"
+    
+    const parsed = {};
+    
+    // Extract GTIN (01)
+    const gtinMatch = scannedData.match(/\(01\)(\d{14})/);
+    if (gtinMatch) parsed.gtin = gtinMatch[1];
+    
+    // Extract Serial (21)
+    const serialMatch = scannedData.match(/\(21\)([^\(]+)/);
+    if (serialMatch) parsed.serialNumber = serialMatch[1];
+    
+    // Extract Expiry (17) - Format: YYMMDD
+    const expiryMatch = scannedData.match(/\(17\)(\d{6})/);
+    if (expiryMatch) {
+      const exp = expiryMatch[1];
+      // Convert YYMMDD to YYYY-MM-DD
+      parsed.expiryDate = `20${exp.substring(0,2)}-${exp.substring(2,4)}-${exp.substring(4,6)}`;
+    }
+    
+    // Extract Batch (10)
+    const batchMatch = scannedData.match(/\(10\)([^\(]+)/);
+    if (batchMatch) parsed.batchNumber = batchMatch[1];
+    
+    return parsed;
+  }
+}
+
+module.exports = new QRCodeService();
+6.3 Verification Logic (CRITICAL)
+This is the heart of the system - where counterfeits are detected.
+
+javascript
+// services/verificationService.js
+
+class VerificationService {
+  
+  /**
+   * Verify medicine authenticity
+   * @param {string} serialNumber - Scanned serial number
+   * @param {string} actorId - Who is scanning (pharmacy ID)
+   * @param {string} actionType - 'verify' or 'dispense'
+   * @returns {Object} Verification result
+   */
+  async verifyMedicine(serialNumber, actorId, actionType = 'verify') {
+    
+    // ========================================
+    // CHECK 1: Does serial number exist?
+    // ========================================
+    const medicine = await db.query(`
+      SELECT 
+        sn.*,
+        p.product_name,
+        p.gtin,
+        m.company_name as manufacturer_name
+      FROM serial_numbers sn
+      JOIN products p ON sn.product_id = p.product_id
+      JOIN manufacturers m ON p.manufacturer_id = m.manufacturer_id
+      WHERE sn.serial_number = $1
+    `, [serialNumber]);
+    
+    if (!medicine.rows.length) {
+      // Serial doesn't exist in database
+      await this.logVerification(serialNumber, actorId, 'invalid', 'Serial number not found');
+      await this.createAlert({
+        type: 'invalid_code',
+        serialNumber,
+        actorId,
+        severity: 'critical',
+        description: `Invalid serial number scanned: ${serialNumber}`
+      });
+      
+      return {
+        valid: false,
+        reason: 'invalid_serial',
+        message: '❌ COUNTERFEIT DETECTED: Serial number not found in database',
+        alertLevel: 'critical'
+      };
+    }
+    
+    const med = medicine.rows[0];
+    
+    // ========================================
+    // CHECK 2: Already dispensed?
+    // ========================================
+    if (med.status === 'dispensed') {
+      // Medicine already sold to someone else
+      const previousTransaction = await db.query(`
+        SELECT 
+          t.transaction_date,
+          t.to_actor_id,
+          a.company_name,
+          a.city
+        FROM transactions t
+        LEFT JOIN supply_chain_actors a ON t.to_actor_id = a.actor_id
+        WHERE t.serial_number = $1 
+          AND t.transaction_type = 'dispense'
+        ORDER BY t.transaction_date DESC
+        LIMIT 1
+      `, [serialNumber]);
+      
+      const prevTx = previousTransaction.rows[0];
+      
+      await this.createAlert({
+        type: 'duplicate_scan',
+        serialNumber,
+        actorId,
+        severity: 'critical',
+        description: `Duplicate serial detected. Already dispensed at ${prevTx.company_name} on ${prevTx.transaction_date}`
+      });
+      
+      return {
+        valid: false,
+        reason: 'already_dispensed',
+        message: `⚠️ DUPLICATE DETECTED: This medicine was already dispensed on ${new Date(prevTx.transaction_date).toLocaleDateString()} at ${prevTx.company_name}, ${prevTx.city}`,
+        alertLevel: 'critical',
+        previousTransaction: prevTx
+      };
+    }
+    
+    // ========================================
+    // CHECK 3: Expired?
+    // ========================================
+    const today = new Date();
+    const expiryDate = new Date(med.expiry_date);
+    
+    if (expiryDate < today) {
+      await this.logVerification(serialNumber, actorId, 'expired', 'Medicine past expiration date');
+      
+      return {
+        valid: false,
+        reason: 'expired',
+        message: `⚠️ EXPIRED: This medicine expired on ${med.expiry_date}`,
+        alertLevel: 'medium',
+        medicine: {
+          product_name: med.product_name,
+          batch_number: med.batch_number,
+          expiry_date: med.expiry_date
+        }
+      };
+    }
+    
+    // ========================================
+    // CHECK 4: Recalled?
+    // ========================================
+    const recalled = await db.query(`
+      SELECT recall_id, recall_reason, severity
+      FROM recalls
+      WHERE product_id = $1
+        AND $2 = ANY(batch_numbers)
+        AND status = 'active'
+    `, [med.product_id, med.batch_number]);
+    
+    if (recalled.rows.length > 0) {
+      const recall = recalled.rows[0];
+      
+      await this.createAlert({
+        type: 'recalled_product',
+        serialNumber,
+        actorId,
+        severity: 'critical',
+        description: `Recalled medicine scanned: ${recall.recall_reason}`
+      });
+      
+      return {
+        valid: false,
+        reason: 'recalled',
+        message: `🚫 RECALLED PRODUCT: ${recall.recall_reason}. DO NOT DISPENSE.`,
+        alertLevel: 'critical',
+        recallInfo: recall
+      };
+    }
+    
+    // ========================================
+    // CHECK 5: Valid supply chain sequence?
+    // ========================================
+    const chainValid = await this.verifySupplyChain(serialNumber, actorId);
+    
+    if (!chainValid.valid) {
+      await this.createAlert({
+        type: 'unauthorized_location',
+        serialNumber,
+        actorId,
+        severity: 'high',
+        description: chainValid.message
+      });
+      
+      return chainValid;
+    }
+    
+    // ========================================
+    // ALL CHECKS PASSED ✅
+    // ========================================
+    
+    if (actionType === 'dispense') {
+      // Update status to dispensed
+      await db.query(`
+        UPDATE serial_numbers
+        SET status = 'dispensed',
+            dispensed_at = NOW(),
+            dispensed_by = $2,
+            updated_at = NOW()
+        WHERE serial_number = $1
+      `, [serialNumber, actorId]);
+      
+      // Log dispensing transaction
+      await db.query(`
+        INSERT INTO transactions 
+        (serial_number, transaction_type, from_actor_id, to_actor_id, scanned_by)
+        VALUES ($1, 'dispense', $2, 'PATIENT', $3)
+      `, [serialNumber, actorId, actorId]);
+    }
+    
+    // Log successful verification
+    await this.logVerification(serialNumber, actorId, 'valid', null);
+    
+    return {
+      valid: true,
+      reason: 'authentic',
+      message: '✅ GENUINE MEDICINE - Safe to dispense',
+      alertLevel: 'none',
+      medicine: {
+        serial_number: serialNumber,
+        product_name: med.product_name,
+        manufacturer: med.manufacturer_name,
+        batch_number: med.batch_number,
+        manufacturing_date: med.manufacturing_date,
+        expiry_date: med.expiry_date,
+        status: med.status
+      }
+    };
+  }
+  
+  /**
+   * Verify supply chain sequence
+   * Ensures medicine followed correct path: manufacturer → wholesaler → pharmacy
+   */
+  async verifySupplyChain(serialNumber, currentActorId) {
+    // Get all transactions for this medicine
+    const transactions = await db.query(`
+      SELECT 
+        t.transaction_type,
+        t.from_actor_id,
+        t.to_actor_id,
+        a1.actor_type as from_type,
+        a2.actor_type as to_type,
+        t.transaction_date
+      FROM transactions t
+      LEFT JOIN supply_chain_actors a1 ON t.from_actor_id = a1.actor_id
+      LEFT JOIN supply_chain_actors a2 ON t.to_actor_id = a2.actor_id
+      WHERE t.serial_number = $1
+      ORDER BY t.transaction_date ASC
+    `, [serialNumber]);
+    
+    const txs = transactions.rows;
+    
+    if (txs.length === 0) {
+      // No previous transactions (just manufactured)
+      return { valid: true };
+    }
+    
+    // Expected sequence: manufacturer → wholesaler → pharmacy → patient
+    const lastTx = txs[txs.length - 1];
+    
+    // Get current actor type
+    const currentActor = await db.query(
+      'SELECT actor_type FROM supply_chain_actors WHERE actor_id = $1',
+      [currentActorId]
+    );
+    
+    if (!currentActor.rows.length) {
+      return {
+        valid: false,
+        reason: 'unknown_actor',
+        message: '⚠️ Unknown scanning location'
+      };
+    }
+    
+    const currentType = currentActor.rows[0].actor_type;
+    
+    // Validate sequence
+    // If last location was wholesaler, current should be pharmacy/hospital
+    // If last location was pharmacy, current should be same pharmacy (for dispensing)
+    
+    if (lastTx.to_type === 'wholesaler' && currentType === 'pharmacy') {
+      return { valid: true }; // Valid transition
+    }
+    
+    if (lastTx.to_type === 'pharmacy' && lastTx.to_actor_id === currentActorId) {
+      return { valid: true }; // Same pharmacy dispensing
+    }
+    
+    // Suspicious: Medicine jumped from one pharmacy to another
+    if (lastTx.to_type === 'pharmacy' && lastTx.to_actor_id !== currentActorId) {
+      return {
+        valid: false,
+        reason: 'suspicious_transfer',
+        message: `⚠️ SUSPICIOUS: Medicine was at a different pharmacy. Possible diversion or theft.`,
+        alertLevel: 'high'
+      };
+    }
+    
+    return { valid: true }; // Default to valid if no issues
+  }
+  
+  /**
+   * Log verification attempt
+   */
+  async logVerification(serialNumber, requestedBy, result, reason) {
+    await db.query(`
+      INSERT INTO verifications 
+      (serial_number, requested_by, verification_result, failure_reason)
+      VALUES ($1, $2, $3, $4)
+    `, [serialNumber, requestedBy, result, reason]);
+  }
+  
+  /**
+   * Create alert for regulators
+   */
+  async createAlert(alertData) {
+    const alert = await db.query(`
+      INSERT INTO alerts 
+      (alert_type, serial_number, actor_id, severity, description)
+      VALUES ($1, $2, $3, $4, $5)
+      RETURNING alert_id
+    `, [
+      alertData.type,
+      alertData.serialNumber || null,
+      alertData.actorId,
+      alertData.severity,
+      alertData.description
+    ]);
+    
+    // TODO: Send real-time notification via WebSocket
+    // this.notifyRegulators(alert.rows[0].alert_id);
+    
+    return alert.rows[0];
+  }
+}
+
+module.exports = new VerificationService();
