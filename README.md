@@ -1,6 +1,6 @@
 # 💊 MediTrack — Medicine Anti-Counterfeit Verification System
 
-MediTrack is an IoT-enabled supply chain tracking platform that fights pharmaceutical counterfeiting. It tracks every medicine from the factory floor to the patient's hands — using unique QR codes, checkpoint scanning, an 8-layer verification engine, and an ESP32-CAM hardware scanner.
+MediTrack is an IoT-enabled supply chain tracking platform that fights pharmaceutical counterfeiting. It tracks every medicine from the factory floor to the patient's hands — using unique QR codes, checkpoint scanning, an 4-layer verification engine, and an ESP32-CAM hardware scanner.
 
 > **Built by:** M. Rithish, D. Hemember, R. Jaidev
 > **Guide:** Dr. P. Kalpana | Vasavi College of Engineering, Hyderabad | 2026
@@ -57,12 +57,8 @@ When anyone scans a medicine, it passes through 8 sequential security checks:
 |-------|---------------|-----------------|
 | 1 | Serial exists in database | Completely fake product |
 | 2 | Not already dispensed | Cloned/photocopied QR code |
-| 3 | Not destroyed or returned | Repackaged waste medicine |
-| 4 | Not past expiry date | Expired medicine resale |
-| 5 | Batch not under recall | Recalled batch still circulating |
-| 6 | At the expected pharmacy | Diverted or stolen stock |
-| 7 | Not scanned 3+ times in 1 hour | Mass-cloned QR codes (velocity attack) |
-| 8 | Batch doesn't have 5+ alerts this week | Batch-level counterfeiting |
+| 3 | Not past expiry date | Expired medicine resale |
+| 4 | Batch not under recall | Recalled batch still circulating |
 
 ### 📷 IoT Hardware Scanner
 An ESP32-CAM with OV3660 camera captures QR codes and sends JPEG frames to the backend over WiFi. The server decodes the QR, runs verification, and sends back a result. The scanner responds with:
